@@ -101,14 +101,49 @@ int main() {
           vector<double> next_x_vals;
           vector<double> next_y_vals;
 
+           
+
           /*
            * TODO: define a path made up of (x,y) points that the car will visit sequentially every .02 seconds
            * Current setting : keep vehicle in the middle lane.
            */
-
           int prev_size = previous_path_x.size();
-          /* Create a list of widely spaced (x, y) points, evenly spaced at 30 m
-             Those point will later be interpolated with spline and fill it in with more points
+
+         /*  Prediction  */
+         if(prev_size  > 0){
+           car_s = end_path_s;
+         }
+
+         bool too_close = false;
+
+         for (int i = 0; i  < sensor_fusion.size(); ++i){
+            /* that car's d*/
+            float d = sensor_fusion[i][6];
+            /*   4<    d  < 8  in 1st lane*/ 
+            if(( d < (2 + 4*lane + 2)) && (d > (2 + 4*lane - 2))){
+              double vx = sensor_fusion[i][3];
+              double vy = sensor_fusion[i][4];
+              double check_speed = sqrt(vx*vx + vy*vy);
+              double check_car_s = sensor_fusion[i][5];
+
+              /* estimate that car's s in the future  since our car has preev_size * 0.02 s to reach the enpd_path_s*/
+              check_car_s += (double)prev_size*0.02*check_speed; 
+
+              if( (check_car_s > car_s) && ((check_car_s-car_s) < 30)){
+                ref_vel = 29.5;
+                too_close = true;
+              }
+            }     
+         }
+
+
+          /* Enod of Prediction */
+
+
+          /* 
+           * Trajectory  
+           * Create a list of widely spaced (x, y) points, evenly spaced at 30 m
+           *  Those point will later be interpolated with spline and fill it in with more points
           */
           vector<double> ptsx;
           vector<double> ptsy;
@@ -172,7 +207,7 @@ int main() {
           /* set(x,y) points to the spline */
           s.set_points(ptsx,ptsy);
 
-          /* Start with all of the previous path points from last time
+          /* Add all of the previous path points from last time
              it helps with transition
           */
           for (int i = 0; i < previous_path_x.size(); ++i){
@@ -210,7 +245,7 @@ int main() {
             next_y_vals.push_back(y_point);          
 
           }
-
+          /* End of Trajectory*/ 
 
           /*
           double dist_inc = 0.5;
