@@ -18,7 +18,7 @@ using std::vector;
   /* Vehicle starts in lane 1, the middle lane */
   int lane = 1;
   /* Reference velocity to target unit mph*/
-  double ref_vel = 49.5; 
+  double ref_vel = 49.0; 
 
 int main() {
   uWS::Hub h;
@@ -121,12 +121,12 @@ int main() {
           /* if previous size is almost empty, use the car as starting reference */
           if (prev_size < 2){
             double prev_car_x = car_x - cos(car_yaw);
-            double prev_car_y = car_x - sin(car_yaw);
+            double prev_car_y = car_y - sin(car_yaw);
 
             ptsx.push_back(prev_car_x);
             ptsx.push_back(car_x);
-            ptsx.push_back(prev_car_y);
-            ptsx.push_back(car_y);
+            ptsy.push_back(prev_car_y);
+            ptsy.push_back(car_y);
           }
           else{
             /* use previous path end point */
@@ -139,8 +139,8 @@ int main() {
 
             ptsx.push_back(ref_x_prev);
             ptsx.push_back(ref_x);
-            ptsx.push_back(ref_y_prev);
-            ptsx.push_back(ref_y);
+            ptsy.push_back(ref_y_prev);
+            ptsy.push_back(ref_y);
           }
 
           /* In Frenet add evenly 30m spaced points ahead of the starting reference */
@@ -152,9 +152,9 @@ int main() {
           ptsx.push_back(next_wp1[0]);
           ptsx.push_back(next_wp2[0]);
 
-          ptsx.push_back(next_wp0[1]);
-          ptsx.push_back(next_wp1[1]);
-          ptsx.push_back(next_wp2[1]);
+          ptsy.push_back(next_wp0[1]);
+          ptsy.push_back(next_wp1[1]);
+          ptsy.push_back(next_wp2[1]);
 
           /*shit all point by reduce ref_x preparing to generate spline*/
           for(int i =0; i < ptsx.size(); ++i)
