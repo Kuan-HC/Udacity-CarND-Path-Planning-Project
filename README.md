@@ -49,18 +49,19 @@ Since this position information is about future, future position of neighbouring
 
 ### Behavior
 According to inputs from prediction module. One of the following action shall be choose
-* Normal
+* Normal  
   Vehicle has a default speed of 49 kph.
-* Follow
-  When all lanes are blocked, following the vehicle aheads
-* Turn Left
+* Follow  
+  When all lanes are blocked, following the vehicle aheads set spped to target vehicle speed
+* Turn Left  
   If there is a slow vehicle aheads and left lane is available, switch to left lane,  
   This action also has priority while both left and right lane are available. 
-* Turn Right
+* Turn Right  
 
 ### Trajectory
-T○ smooth the transition, use the last two point from ```previous_path``` to make sure new trajectory will tangent to ```previous_path```.
-Another 3 future points at S distance 30, 60 and 90 are generated for computing a smooth spline curve. 
+To  smooth the transition, use the last two point from ```previous_path``` to make sure new trajectory will tangent to ```previous_path```  
+and another 3 future points at S distance 35, 60 and 90 to  generate  a smooth spline curve. 
+This spline curve are further processed to create trajectory x and y position.
 
 
 
