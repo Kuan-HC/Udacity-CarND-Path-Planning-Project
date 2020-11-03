@@ -9,16 +9,20 @@
 #include "json.hpp"
 #include "spline.h"
 
+#define default_speed 49.0
+#define safe_dist 30.0
+
 // for convenience
 using nlohmann::json;
 using std::string;
 using std::vector;
 
-
-  /* Vehicle starts in lane 1, the middle lane */
-  int lane = 1;
-  /* Reference velocity to target unit mph*/
-  double ref_vel = 49.0; 
+enum behavior{
+  normal,
+  follow,
+  turn_left,
+  turn_right
+};
 
 int main() {
   uWS::Hub h;
@@ -57,8 +61,12 @@ int main() {
     map_waypoints_dy.push_back(d_y);
   }
 
+  /* Vehicle starts in lane 1, the middle lane */
+  int lane = 1;
+  /* Reference velocity to target unit mph*/
+  double ref_vel = 0.0; 
 
-  h.onMessage([&map_waypoints_x,&map_waypoints_y,&map_waypoints_s,
+  h.onMessage([&ref_vel, &lane, &map_waypoints_x,&map_waypoints_y,&map_waypoints_s,
                &map_waypoints_dx,&map_waypoints_dy]
               (uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length,
                uWS::OpCode opCode) {
@@ -99,9 +107,7 @@ int main() {
           json msgJson;
 
           vector<double> next_x_vals;
-          vector<double> next_y_vals;
-
-           
+          vector<double> next_y_vals;          
 
           /*
            * TODO: define a path made up of (x,y) points that the car will visit sequentially every .02 seconds
@@ -109,42 +115,114 @@ int main() {
            */
           int prev_size = previous_path_x.size();
 
-         /*  Prediction  */
+  /**************************************  
+  *            Prediction
+  ***************************************/
          if(prev_size  > 0){
            car_s = end_path_s;
          }
 
          bool too_close = false;
+         bool left_ln_avl = true;
+         bool right_ln_avl = true;
+         double front_car_speed = 0.0;
 
          for (int i = 0; i  < sensor_fusion.size(); ++i){
             /* that car's d*/
             float d = sensor_fusion[i][6];
-            /*   4<    d  < 8  in 1st lane*/ 
-            if(( d < (2 + 4*lane + 2)) && (d > (2 + 4*lane - 2))){
+            
               double vx = sensor_fusion[i][3];
               double vy = sensor_fusion[i][4];
               double check_speed = sqrt(vx*vx + vy*vy);
-              double check_car_s = sensor_fusion[i][5];
+              double check_car_s = sensor_fusion[i][5];              
 
               /* estimate that car's s in the future  since our car has preev_size * 0.02 s to reach the enpd_path_s*/
               check_car_s += (double)prev_size*0.02*check_speed; 
-
-              if( (check_car_s > car_s) && ((check_car_s-car_s) < 30)){
-                ref_vel = 29.5;
-                too_close = true;
+              double gap = fabs(car_s - check_car_s);
+             
+            if (gap < safe_dist)
+            {
+              if(( d < (2 + 4*lane + 2)) && (d > (2 + 4*lane - 2)) && (check_car_s > car_s))
+              {
+               too_close = true;
+               front_car_speed = front_car_speed;               
               }
-            }     
-         }
+              /* check left lane availability 
+               * if vehicle is on leftest lane or there is a vehicle on left lane
+               * make left lane not available
+               */
+              if( (lane == 0) || (( d < (2 + 4*(lane - 1) + 2)) && (d > (2 + 4*(lane - 1) - 2))))
+              {
+                left_ln_avl = false;
+              }
+
+              /* check right lane availability */
+              if( (lane == 2) || (( d < (2 + 4*(lane + 1) + 2)) && (d > (2 + 4*(lane + 1) - 2))) )
+              {
+                right_ln_avl = false;
+              }
+
+            }                
+          }
+          std::cout <<"too_close " << too_close << " right_ln_avl " << right_ln_avl <<" left_ln_avl " << left_ln_avl <<std::endl;
+
+  /*           Enod of Prediction       */
+
+  /**************************************
+  *              Behavior
+  ***************************************/
+          behavior action = normal;
+          /*
+         bool too_close = false;
+         bool left_ln_avl = true;
+         bool right_ln_avl = true;
+
+          normal,
+          follow,
+          turn_left,
+          turn_right
+          */
+          
+          if(too_close == true && left_ln_avl == true)
+            action = turn_left;
+          else if(too_close == true && left_ln_avl == false && right_ln_avl == true)
+            action = turn_right;
+          else if(too_close == true && left_ln_avl == false && right_ln_avl == false)
+            action = follow;
+    
+          switch (action)
+          {
+          case normal:
+            if(ref_vel < default_speed)
+              ref_vel += 0.224;
+            break;
+          
+          case turn_left:
+            lane -= 1;
+            break;
+
+          case turn_right:
+            lane += 1;
+            break;
+
+          case follow:
+            if (ref_vel > front_car_speed)
+              ref_vel -= 0.224;
+            break;
+
+          }
+          
+          std::cout <<"mode"<< action << std::endl;
+          std::cout <<"ref_vel"<< ref_vel << std::endl;
+
+          /* End of Behavior */
 
 
-          /* Enod of Prediction */
-
-
-          /* 
+          /************************************************************************************ 
            * Trajectory  
            * Create a list of widely spaced (x, y) points, evenly spaced at 30 m
            *  Those point will later be interpolated with spline and fill it in with more points
-          */
+           ************************************************************************************/
           vector<double> ptsx;
           vector<double> ptsy;
 
@@ -179,9 +257,9 @@ int main() {
           }
 
           /* In Frenet add evenly 30m spaced points ahead of the starting reference */
-          vector<double> next_wp0 = getXY(car_s + 30, 6, map_waypoints_s, map_waypoints_x, map_waypoints_y);
-          vector<double> next_wp1 = getXY(car_s + 60, 6, map_waypoints_s, map_waypoints_x, map_waypoints_y);
-          vector<double> next_wp2 = getXY(car_s + 90, 6, map_waypoints_s, map_waypoints_x, map_waypoints_y);
+          vector<double> next_wp0 = getXY(car_s + 30, 2 + 4*lane, map_waypoints_s, map_waypoints_x, map_waypoints_y);
+          vector<double> next_wp1 = getXY(car_s + 60, 2 + 4*lane, map_waypoints_s, map_waypoints_x, map_waypoints_y);
+          vector<double> next_wp2 = getXY(car_s + 90, 2 + 4*lane, map_waypoints_s, map_waypoints_x, map_waypoints_y);
 
           ptsx.push_back(next_wp0[0]);
           ptsx.push_back(next_wp1[0]);
@@ -246,18 +324,6 @@ int main() {
 
           }
           /* End of Trajectory*/ 
-
-          /*
-          double dist_inc = 0.5;
-          for (int i = 0; i < 50; ++i) {
-
-          double next_s = car_s + ( i+1 )*dist_inc; 
-          double next_d = 6;
-          vector<double> xy = getXY(next_s, next_d, map_waypoints_s, map_waypoints_x, map_waypoints_y);
-          next_x_vals.push_back(xy[0]);
-          next_y_vals.push_back(xy[1]);
-          }
-          */
 
           /* End of TODO */
           msgJson["next_x"] = next_x_vals;
