@@ -9,7 +9,7 @@
 #include "json.hpp"
 #include "spline.h"
 
-#define default_speed 49.0
+#define default_speed 48.0
 #define safe_dist 30.0
 
 // for convenience
@@ -115,9 +115,9 @@ int main() {
            */
           int prev_size = previous_path_x.size();
 
-  /**************************************  
-  *            Prediction
-  ***************************************/
+        /**************************************  
+        *            Prediction
+        ***************************************/
          if(prev_size  > 0){
            car_s = end_path_s;
          }
@@ -127,25 +127,25 @@ int main() {
          bool right_ln_avl = true;
          double front_car_speed = 0.0;
 
-         for (int i = 0; i  < sensor_fusion.size(); ++i){
+         for (int i = 0; i  < sensor_fusion.size(); ++i)
+         {
             /* that car's d*/
-            float d = sensor_fusion[i][6];
-            
-              double vx = sensor_fusion[i][3];
-              double vy = sensor_fusion[i][4];
-              double check_speed = sqrt(vx*vx + vy*vy);
-              double check_car_s = sensor_fusion[i][5];              
+            float d = sensor_fusion[i][6];            
+            double vx = sensor_fusion[i][3];
+            double vy = sensor_fusion[i][4];
+            double check_speed = sqrt(vx*vx + vy*vy);
+            double check_car_s = sensor_fusion[i][5];              
 
-              /* estimate that car's s in the future  since our car has preev_size * 0.02 s to reach the enpd_path_s*/
-              check_car_s += (double)prev_size*0.02*check_speed; 
-              double gap = fabs(car_s - check_car_s);
+            /* estimate that car's s in the future  since our car has preev_size * 0.02 s to reach the enpd_path_s*/
+            check_car_s += (double)prev_size*0.02*check_speed; 
+            double gap = fabs(car_s - check_car_s);
              
             if (gap < safe_dist)
             {
               if(( d < (2 + 4*lane + 2)) && (d > (2 + 4*lane - 2)) && (check_car_s > car_s))
               {
                too_close = true;
-               front_car_speed = front_car_speed;               
+               front_car_speed = check_speed;               
               }
               /* check left lane availability 
                * if vehicle is on leftest lane or there is a vehicle on left lane
@@ -161,28 +161,19 @@ int main() {
               {
                 right_ln_avl = false;
               }
-
             }                
           }
           std::cout <<"too_close " << too_close << " right_ln_avl " << right_ln_avl <<" left_ln_avl " << left_ln_avl <<std::endl;
+          std::cout <<"front_car_spd " << front_car_speed << std::endl;
 
-  /*           Enod of Prediction       */
+        /*           Enod of Prediction       */
 
-  /**************************************
-  *              Behavior
-  ***************************************/
+        /**************************************
+        *              Behavior
+        ***************************************/
           behavior action = normal;
-          /*
-         bool too_close = false;
-         bool left_ln_avl = true;
-         bool right_ln_avl = true;
 
-          normal,
-          follow,
-          turn_left,
-          turn_right
-          */
-          
+          /* Choose next action */         
           if(too_close == true && left_ln_avl == true)
             action = turn_left;
           else if(too_close == true && left_ln_avl == false && right_ln_avl == true)
@@ -195,25 +186,21 @@ int main() {
           case normal:
             if(ref_vel < default_speed)
               ref_vel += 0.224;
-            break;
-          
+            break;          
           case turn_left:
             lane -= 1;
             break;
-
           case turn_right:
             lane += 1;
             break;
-
           case follow:
             if (ref_vel > front_car_speed)
               ref_vel -= 0.224;
             break;
-
           }
           
-          std::cout <<"mode"<< action << std::endl;
-          std::cout <<"ref_vel"<< ref_vel << std::endl;
+          std::cout <<" mode "<< action ;
+          std::cout <<" ref_vel "<< ref_vel << std::endl;
 
           /* End of Behavior */
 
@@ -302,8 +289,9 @@ int main() {
 
           /* Fill up the rest of our path planner after filling it with previous points, we alsyas outpout 50 points */
 
-          for (int i = 0; i <= 50 - previous_path_x.size(); ++i){
-            double N = (target_dist/(0.02 * ref_vel / 2.24));   /* transfer mph to m */
+          for (int i = 0; i <= 50 - previous_path_x.size(); ++i)
+          {
+            double N = (target_dist/(0.02 * ref_vel / 2.24));   /* transfer mph to ms */
             double x_point = x_add_on + (target_x)/N;
             double y_point = s(x_point);
 
@@ -321,7 +309,6 @@ int main() {
 
             next_x_vals.push_back(x_point);
             next_y_vals.push_back(y_point);          
-
           }
           /* End of Trajectory*/ 
 
